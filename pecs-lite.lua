@@ -1,22 +1,21 @@
--- A PICO-8 Entity Component System (ECS) library
--- License: MIT Copyright (c) 2021 Jess Telford
--- From: https://github.com/jesstelford/pico-8-pecs
+-- a pico-8 entity component system (ecs) library
+-- license: mit copyright (c) 2021 jess telford
+-- from: https://github.com/jesstelford/pico-8-pecs
 
--- This "lite" version contains no "System" portion, and reduces token use where
+-- this "lite" version contains no "system" portion, and reduces token use where
 -- possible.
--- Use this if you want to save tokens, or are not using the System or Query
--- aspects of PECS
-local createECSWorld do
-  local _highestId = 0
+-- use this if you want to save tokens, or are not using the system or query
+-- aspects of pecs
+local createecsworld do
+  local _highestid = 0
 
   function cuid()
-    _highestId += 1
-    return _highestId
+    _highestid += 1
+    return _highestid
   end
 
   function assign(...)
-    local result = {}
-    local args = { n = select("#", ...), ... }
+    local result, args = {}, { n = select("#", ...), ... }
     for i = 1, args.n do
       if (type(args[i]) == "table") then
         for key, value in pairs(args[i]) do result[key] = value end
@@ -25,80 +24,71 @@ local createECSWorld do
     return result
   end
 
-  createECSWorld = function()
-    local entities = {}
-    local onNextUpdateStack = {}
+  createecsworld = function()
+    local entities, onnextupdatestack = {}, {}
 
-    function addComponentToEntity(entity, component)
-      -- Only components created by createComponent() can be added
-      assert(component and component._componentFactory)
-      -- And only once
-      assert(not entity[component._componentFactory])
+    function addcomponenttoentity(entity, component)
+      -- only components created by createcomponent() can be added
+      assert(component and component._componentfactory)
+      -- and only once
+      assert(not entity[component._componentfactory])
 
-      -- Store the component keyed by its factory
-      entity[component._componentFactory] = component
+      -- store the component keyed by its factory
+      entity[component._componentfactory] = component
     end
 
-    function createEntity(attributes, ...)
+    function createentity(attributes, ...)
       local entity = assign({}, attributes or {})
 
       entity._id = cuid()
 
       setmetatable(entity,{
         __add=function(self, component)
-          addComponentToEntity(self, component)
+          addcomponenttoentity(self, component)
           return self
         end,
 
-        __sub=function(self, componentFactory)
-          self[componentFactory] = nil
+        __sub=function(self, componentfactory)
+          self[componentfactory] = nil
           return self
         end
       })
 
       for component in all(pack(...)) do
-        addComponentToEntity(entity, component)
+        addcomponenttoentity(entity, component)
       end
 
       entities[entity._id] = entity
       return entity
     end
 
-    function createComponent(defaults)
-      local function componentFactory(attributes)
-        local component = assign({}, defaults, attributes)
-        component._componentFactory = componentFactory
-        component._id = cuid()
-        return component
-      end
-      return componentFactory
-    end
-
-    function removeEntity(entity)
-      entities[entity._id] = nil
-    end
-
-    -- Useful for delaying actions until the next turn of the update loop.
-    -- Particularly when the action would modify a list that's currently being
-    -- iterated on such as removing an item due to collision, or spawning new items.
-    function queue(callback)
-      add(onNextUpdateStack, callback)
-    end
-
-    -- Must be called at the start of each update() before anything else
-    function update()
-      for callback in all(onNextUpdateStack) do
-        callback()
-        del(onNextUpdateStack, callback)
-      end
-    end
-
     return {
-      createEntity=createEntity,
-      createComponent=createComponent,
-      removeEntity=removeEntity,
-      queue=queue,
-      update=update,
+      createentity=createentity,
+      createcomponent=function(defaults)
+        local function componentfactory(attributes)
+          local component = assign({}, defaults, attributes)
+          component._componentfactory = componentfactory
+          component._id = cuid()
+          return component
+        end
+        return componentfactory
+      end,
+      removeentity=function(entity)
+        entities[entity._id] = nil
+      end,
+      -- useful for delaying actions until the next turn of the update loop.
+      -- particularly when the action would modify a list that's currently being
+      -- iterated on such as removing an item due to collision, or spawning new items.
+      queue = function queue(callback)
+        add(onnextupdatestack, callback)
+      end,
+      -- must be called at the start of each update() before anything else
+      update=function()
+        for callback in all(onnextupdatestack) do
+          callback()
+          del(onnextupdatestack, callback)
+        end
+      end
     }
   end
 end
